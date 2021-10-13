@@ -49,6 +49,7 @@ VkExtent2D swapChainExtent;
 std::vector<VkImageView> swapChainImageViews;
 VkRenderPass renderPass;
 VkPipelineLayout pipelineLayout; // Not used yet
+VkPipeline graphicsPipeline;
 
 VkResult CreateDebugUtilsMessengerEXT( VkInstance instance,
    const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
@@ -683,7 +684,7 @@ void createGraphicsPipeline()
   colorBlending.blendConstants[2] = 0.0f; // Optional 
   colorBlending.blendConstants[3] = 0.0f; // Optional 
 
-  // Dynamic State (Can be changed without recreating the pipeline
+  // Dynamic State (Can be changed without recreating the pipeline, not used for now)
   VkDynamicState dynamicStates[] ={
     VK_DYNAMIC_STATE_VIEWPORT,
     VK_DYNAMIC_STATE_LINE_WIDTH
@@ -705,6 +706,34 @@ void createGraphicsPipeline()
 
   if (vkCreatePipelineLayout(Device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS)
     throw std::runtime_error("failed to create pipeline layout");
+
+  VkGraphicsPipelineCreateInfo pipelineInfo{};
+  pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+  pipelineInfo.stageCount = 2;
+  pipelineInfo.pStages = shaderStages;
+  
+  pipelineInfo.pVertexInputState = &vertexInputInfo;
+  pipelineInfo.pInputAssemblyState = &inputAssembly;
+  pipelineInfo.pViewportState = &viewportState;
+  pipelineInfo.pRasterizationState = &rasterizer;
+  pipelineInfo.pMultisampleState = &multisampling;
+  pipelineInfo.pDepthStencilState = nullptr;
+  pipelineInfo.pColorBlendState = &colorBlending;
+  pipelineInfo.pDynamicState = nullptr;
+
+  pipelineInfo.layout = pipelineLayout;
+  pipelineInfo.renderPass = renderPass;
+  pipelineInfo.subpass = 0; // This pipeline will be used for the color render pass we defined
+                            // Several renderpasses compatible with renderpass can be used, 
+                            // but that functionality is out of scope.
+
+  // Used to create a pipeline based on another pipeline if they have alot in common.
+  // Requires flags field to have VK_PIPELINE_CREATE_DERIVATIVE_BIT set
+  pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; // Optional
+  pipelineInfo.basePipelineIndex = -1; // Optional
+
+  if (vkCreateGraphicsPipelines(Device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS)
+    throw std::runtime_error("failed to create graphics pipeline");
 
   vkDestroyShaderModule(Device, vertShaderModule, nullptr);
   vkDestroyShaderModule(Device, fragShaderModule, nullptr);
@@ -766,6 +795,7 @@ void initVulkan()
 
 void cleanup()
 {
+  vkDestroyPipeline(Device, graphicsPipeline, nullptr);
   vkDestroyPipelineLayout(Device, pipelineLayout, nullptr);
   vkDestroyRenderPass(Device, renderPass, nullptr);
   for (auto imageView : swapChainImageViews)
