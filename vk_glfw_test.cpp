@@ -47,6 +47,7 @@ std::vector<VkImage> swapChainImages;
 VkFormat swapChainImageFromat;
 VkExtent2D swapChainExtent;
 std::vector<VkImageView> swapChainImageViews;
+VkRenderPass renderPass;
 VkPipelineLayout pipelineLayout; // Not used yet
 
 VkResult CreateDebugUtilsMessengerEXT( VkInstance instance,
@@ -709,21 +710,64 @@ void createGraphicsPipeline()
   vkDestroyShaderModule(Device, fragShaderModule, nullptr);
 }
 
+void createRenderPass()
+{
+  VkAttachmentDescription colorAttachment{};
+  colorAttachment.format = swapChainImageFromat;
+  colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+  colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; // Clear the image before rendering;
+  colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE; // Store the image after rendering so we can display it.
+  colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE; // We don't use stencil buffer atm
+  colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+  colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Since we clear the image we don't care about the layout before rendering.
+  colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR; // Optimize layout for presenting on screen
+
+  VkAttachmentReference colorAttachmentRef{};
+  colorAttachmentRef.attachment = 0; // Since we only have 1 colorAttachment, it's index will be 0
+  colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+  // The index of this attachment is directly referenced in the shader code with the
+  // 'layout (location = 0) out vec4 outColor' directive
+  // Following types of attachments exist
+  //
+  // -  pInputAttachments: Attachments that are read from a shader
+  // -  pResolveAttachments: Attachments used for multisampling color attachments
+  // -  pDepthStencilAttachment: Attachment for depth and stencil data
+  // -  pPreserveAttachments: Attachments that are not used by this subpass, but for which the data must be preserved
+  VkSubpassDescription subpass{};
+  subpass.colorAttachmentCount = 1;
+  subpass.pColorAttachments = &colorAttachmentRef;
+  
+  VkRenderPassCreateInfo renderPassInfo{};
+  renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+  renderPassInfo.attachmentCount = 1;
+  renderPassInfo.pAttachments = &colorAttachment;
+  renderPassInfo.subpassCount = 1;
+  renderPassInfo.pSubpasses = &subpass;
+
+  if (vkCreateRenderPass(Device, &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS)
+    throw std::runtime_error("failed to create render pass.");
+    
+  
+}
+
 void initVulkan()
 {
-  createInstance();      // Create a Vulkan instance
-  setupDebugMessenger(); // Set up debug messengers 
-  createSurface();       // Create a render surface, basically a glfw window with a vulkan context.
-  pickPhysicalDevice();  // Choose graphics card
-  createLogicalDevice(); // Configure the capabilities of the card
-  createSwapChain();     // Create a chain of images to displat
-  createImageViews();    // Configure each image in the chain
-  createGraphicsPipeline();
+  createInstance();         // Create a Vulkan instance
+  setupDebugMessenger();    // Set up debug messengers 
+  createSurface();          // Create a render surface, basically a glfw window with a vulkan context.
+  pickPhysicalDevice();     // Choose graphics card
+  createLogicalDevice();    // Configure the capabilities of the card
+  createSwapChain();        // Create a chain of images to displat
+  createImageViews();       // Configure each image in the chain
+  createRenderPass();       // Structure referenced by the pipeline
+  createGraphicsPipeline(); // Set up buffers, renderstate, blending etc
 }
 
 void cleanup()
 {
   vkDestroyPipelineLayout(Device, pipelineLayout, nullptr);
+  vkDestroyRenderPass(Device, renderPass, nullptr);
   for (auto imageView : swapChainImageViews)
     vkDestroyImageView(Device, imageView, nullptr);
   vkDestroySwapchainKHR(Device,swapChain,nullptr);
