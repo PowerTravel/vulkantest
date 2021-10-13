@@ -45,6 +45,7 @@ VkSwapchainKHR swapChain;
 std::vector<VkImage> swapChainImages;
 VkFormat swapChainImageFromat;
 VkExtent2D swapChainExtent;
+std::vector<VkImageView> swapChainImageViews;
 
 VkResult CreateDebugUtilsMessengerEXT( VkInstance instance,
    const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
@@ -514,18 +515,48 @@ void createSwapChain()
 
 }
 
+void createImageViews()
+{
+  swapChainImageViews.resize(swapChainImages.size());
+  for (size_t i = 0; i < swapChainImages.size(); ++i)
+  {
+    VkImageViewCreateInfo createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    createInfo.image = swapChainImages[i];
+    createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    createInfo.format = swapChainImageFromat;
+    createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY; // No swizzling
+    createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+    createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+    createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+    createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; // Used as color target
+    createInfo.subresourceRange.baseMipLevel = 0; // No MipMaping
+    createInfo.subresourceRange.levelCount = 1;
+    createInfo.subresourceRange.baseArrayLayer = 0;
+    createInfo.subresourceRange.layerCount = 1;
+
+    if (vkCreateImageView(Device, &createInfo, nullptr, &swapChainImageViews[i]) != VK_SUCCESS)
+      throw std::runtime_error("failed to create image views");
+
+  }
+}
+
 void initVulkan()
 {
-  createInstance();
-  setupDebugMessenger();
-  createSurface();
-  pickPhysicalDevice();
-  createLogicalDevice();
-  createSwapChain();
+  createInstance();      // Create a Vulkan instance
+  setupDebugMessenger(); // Set up debug messengers 
+  createSurface();       // Create a render surface, basically a glfw window with a vulkan context.
+  pickPhysicalDevice();  // Choose graphics card
+  createLogicalDevice(); // Configure the capabilities of the card
+  createSwapChain();     // Create a chain of images to displat
+  createImageViews();    // Configure each image in the chain
 }
 
 void cleanup()
 {
+  for (auto imageView : swapChainImageViews)
+    vkDestroyImageView(Device, imageView, nullptr);
   vkDestroySwapchainKHR(Device,swapChain,nullptr);
   vkDestroyDevice(Device, nullptr);
   if (enableValidationLayers) {
